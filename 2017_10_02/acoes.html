@@ -17,7 +17,7 @@
 	<script type="text/javascript">
         var compositeChart = dc.compositeChart('#chart');
 
-		d3.csv("stocks.csv", function(data){;
+		d3.csv("stocks.csv", function(data){
 			// formatando nossos dados
             var dtgFormat = d3.time.format("%Y/%m/%d");
             data.forEach(function(d){
@@ -27,8 +27,6 @@
                 d.facebook = +d.facebook;
                 d.facebook2 = (d.facebook/data[0].facebook)*100;
             });
-
-            alert("rafael");
 
             //criando um crossfilter
             var facts = crossfilter(data);
