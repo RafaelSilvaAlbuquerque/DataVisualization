@@ -34,11 +34,23 @@
                 <div id="mapid"></div>
         
                 <div id='magnitude-chart'>
-                  <h4> Number of Events by Magnitude </h4>
+                  <h4> Number of Events by magnitude
+                  <span>
+					<a class="reset"
+						href="javascript:magnitudeChart.filterAll();dc.redrawAll();"
+						style="display: none;"> reset
+					</a>
+					</span></h4>
                 </div>
                     
                 <div id='depth-chart'>
-                  <h4> Events by Depth (km) </h4>
+                  <h4> Events by Depth (km) 
+                  <span>
+					<a class="reset"
+						href="javascript:depthChart.filterAll();dc.redrawAll();"
+						style="display: none;"> reset
+					</a>
+					</span></h4>
                 </div>
                    
                 <div>
@@ -71,6 +83,14 @@
                         attribution: '&copy; <a href="http://www.openstreetmap.org/">OpenStreetMap</a> contributors',
                         maxZoom: 17
                         }).addTo(map);
+            
+            var markers = d3.map();
+            var markerLayer = L.layerGroup();
+
+            var visibleMarkers = new Array();
+
+            //ids
+			var idDimension, idGrouping;
 
             // load data from a csv file
             d3.csv("earthquakes.csv", function (data) {
@@ -84,17 +104,25 @@
                 d.mag = d3.round(+d.magnitude, 1);
                 d.depth = d3.round(+d.depth, 0);
                 var size = d.mag * 10000;
-                var circle = L.circle([d.lat, d.long], size, {
+                var circle = L.circle([d.lat, d.long], d.mag*5000, {
                         color: '#fd8d3c',
-                        weight: 1,
+                        weight: 2,
                         fillColor: '#fecc5c',
-                        fillOpacity: 0.5
-                    }).addTo(map);
+                    });
                 circle.bindPopup("Magnitude: "+d.mag+"<br>Time: "+d.dtg);
+                circle.publicid = d.publicid; //this is for linking on the other direction
+                markers.set(d.publicid, circle);
               });
+
+              
+
+
               //console.log(data);
               // Run the data through crossfilter and load our 'facts'
               var facts = crossfilter(data);
+
+              idDimension = facts.dimension(function(d) { return d.publicid; });
+			  idGrouping = idDimension.group(function(id) { return id; });
 
               //Create dataTable dimension using the date (dtg)
              var dateDimension = facts.dimension(function (d){
@@ -143,7 +171,10 @@
                   .centerBar(true)
                   .gap(56)
                   .x(d3.scale.linear().domain([0, 8]))
-                  .elasticY(true); 
+                  .elasticY(true)
+                  .on("filtered", function(chart,filter){
+					updateMakers();
+				  }); 
 
               // Configure Depth bar graph
               // 480 x 150
@@ -157,7 +188,10 @@
                   .centerBar(true)
                   .gap(1)
                   .x(d3.scale.linear().domain([0, 100]))
-                  .elasticY(true);
+                  .elasticY(true)
+                  .on("filtered", function(chart,filter){
+					updateMakers();
+				  });
               // Configure Time line graph
               // height: 150
               //x dimension: build the time scale from the data: d3.time.scale().domain(d3.extent(data, function(d) { return d.dtime; }))
@@ -188,8 +222,56 @@
 
               // Render the Charts
               dc.renderAll();
+              updateMarkers(); //this function will be defined below
   
             });
+
+			function updateMakers(){
+				var ids = idGrouping.all();
+				var todisplay = new Array(ids.length);
+				var mc = 0;
+				for(var i = 0;i < ids.length;i++){
+					var tId = ids[i];
+					if(tId.value > 0){
+						todisplay[mc] = markers.get(tId.key);
+						mc = mc + 1;
+					}
+				}
+				todisplay.length = mc; //resize the array so Leaflet does not complain
+				markerLayer.clearLayers(); //remove markers in layerGroup
+				if (map.hasLayer(markerLayer)){
+					map.removeLayer(markerLayer); //remove layerGroup if present
+				}
+				markerLayer = L.layerGroup(todisplay).addTo(map); //add it again passing the array of markers
+
+			}
+
+			//handling map events:
+			map.on('moveend', updateFilters);
+
+			function updateFilters(){
+				var i = 0;
+				//var visibleMarkers;
+				markerLayer.eachLayer(function(layer) {
+					if( map.getBounds().contains(layer.getLatLng()) ){
+						visibleMarkers.push(layer.publicid);
+						//alert(visibleMarkers.length);
+						//visibleMarkers[i] = markers.get(layer.publicid);
+					//	visibleMarkers.set(markers.get(layer.publicid),layer.getLatLng());
+					}
+					//add layer.publicid to some array visibleMarkers
+					//i = i+1;
+					//layer.bindPopup("Magn: "+layer.publicid+"<br>T: "+layer.dtg);
+					
+				});
+				idDimension.filterFunction(function(d){
+					return visibleMarkers.indexOf(d) > -1;
+				});
+				dc.redrawAll(layer.publicid);
+			}
+
+
+
             </script>
 
             <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
